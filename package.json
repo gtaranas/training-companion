@@ -1,0 +1,24 @@
+{
+  "name": "soccer-prediction-agent",
+  "version": "1.0.0",
+  "description": "Self-learning soccer prediction agent using ACE framework with DeepSeek",
+  "type": "module",
+  "scripts": {
+    "start": "streamlit run app.py",
+    "lint": "eslint . --ext .js,.ts,.jsx,.tsx",
+    "test": "jest",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "soccer",
+    "prediction",
+    "self-learning",
+    "agent",
+    "deepseek"
+  ],
+  "author": "Giannhs Taranas",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.2"
+  }
+}
