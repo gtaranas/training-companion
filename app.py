@@ -43,12 +43,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
-if 'agent' not in st.session_state:
-    st.session_state.agent = None
-    st.session_state.api_key = ""
-    st.session_state.predictions = []
-    st.session_state.learning_history = []
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
 def initialize_agent(api_key: str):
     """Initialize the soccer prediction agent"""
@@ -60,6 +57,17 @@ def initialize_agent(api_key: str):
         return False, f"Error initializing agent: {str(e)}"
 
 def main():
+    # Initialize session state (on first run)
+    if 'agent' not in st.session_state:
+        st.session_state.agent = None
+        st.session_state.api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        st.session_state.predictions = []
+        st.session_state.learning_history = []
+        
+        # Auto-initialize agent if API key is in environment
+        if st.session_state.api_key:
+            initialize_agent(st.session_state.api_key)
+    
     st.title("⚽ Self-Learning Soccer Prediction Agent")
     st.markdown("*Powered by ACE Framework & DeepSeek AI*")
     
@@ -67,12 +75,18 @@ def main():
     with st.sidebar:
         st.header("Configuration")
         
-        # API Key input
+        # Show API key status
+        if st.session_state.api_key:
+            st.success("✅ API Key loaded from environment")
+        else:
+            st.info("⚠️ API Key not found in environment")
+        
+        # API Key input (optional if already loaded)
         api_key_input = st.text_input(
-            "DeepSeek API Key",
+            "DeepSeek API Key (optional if set in .env)",
             type="password",
             value=st.session_state.api_key,
-            placeholder="Enter your DeepSeek API key"
+            placeholder="Or paste your DeepSeek API key here"
         )
         
         if api_key_input and api_key_input != st.session_state.api_key:
@@ -187,51 +201,58 @@ def main():
                                 if prediction["key_factors"]:
                                     for i, factor in enumerate(prediction["key_factors"], 1):
                                         st.write(f"{i}. {factor}")
-                                
-                                # Record actual outcome
-                                st.markdown("---")
-                                st.subheader("Record Actual Outcome (for learning)")
-                                
-                                actual_outcome = st.radio(
-                                    "What was the actual match result?",
-                                    ["Home Win", "Draw", "Away Win", "Not Yet Played"],
-                                    horizontal=True
-                                )
-                                
-                                if st.button("✅ Record Outcome", key="record_outcome", use_container_width=True):
-                                    if actual_outcome != "Not Yet Played":
-                                        with st.spinner("🧠 Learning from outcome..."):
-                                            learning_result = st.session_state.agent.record_outcome(
-                                                prediction,
-                                                actual_outcome
-                                            )
-                                            
-                                            st.session_state.learning_history.append({
-                                                "match": prediction["match"],
-                                                "timestamp": datetime.now().isoformat(),
-                                                "accuracy": learning_result["accuracy"],
-                                                "reflections": learning_result["reflections"]
-                                            })
-                                            
-                                            if learning_result["accuracy"]:
-                                                st.success("✅ Correct prediction! Agent has learned from this success.")
-                                            else:
-                                                st.info("❌ Incorrect prediction. Agent is learning from this failure.")
-                                            
-                                            st.subheader("Agent Insights")
-                                            if learning_result["reflections"]["insights"]:
-                                                for insight in learning_result["reflections"]["insights"]:
-                                                    st.markdown(f"💡 {insight}")
-                                            
-                                            st.subheader("Recommendations for Next Time")
-                                            if learning_result["reflections"]["recommendations"]:
-                                                for i, rec in enumerate(learning_result["reflections"]["recommendations"], 1):
-                                                    st.markdown(f"{i}. {rec}")
-                                    else:
-                                        st.warning("Please select an actual outcome to record learning.")
                             
                             except Exception as e:
                                 st.error(f"Error generating prediction: {str(e)}")
+            
+            # Record actual outcome (outside form)
+            if st.session_state.predictions:
+                st.markdown("---")
+                st.subheader("Record Actual Outcome (for learning)")
+                
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    actual_outcome = st.radio(
+                        "What was the actual match result?",
+                        ["Home Win", "Draw", "Away Win", "Not Yet Played"],
+                        horizontal=True
+                    )
+                
+                with col2:
+                    if st.button("✅ Record Outcome", use_container_width=True):
+                        if actual_outcome != "Not Yet Played":
+                            # Get the last prediction
+                            prediction = st.session_state.predictions[-1]
+                            
+                            with st.spinner("🧠 Learning from outcome..."):
+                                learning_result = st.session_state.agent.record_outcome(
+                                    prediction,
+                                    actual_outcome
+                                )
+                                
+                                st.session_state.learning_history.append({
+                                    "match": prediction["match"],
+                                    "timestamp": datetime.now().isoformat(),
+                                    "accuracy": learning_result["accuracy"],
+                                    "reflections": learning_result["reflections"]
+                                })
+                                
+                                if learning_result["accuracy"]:
+                                    st.success("✅ Correct prediction! Agent has learned from this success.")
+                                else:
+                                    st.info("❌ Incorrect prediction. Agent is learning from this failure.")
+                                
+                                st.subheader("Agent Insights")
+                                if learning_result["reflections"]["insights"]:
+                                    for insight in learning_result["reflections"]["insights"]:
+                                        st.markdown(f"💡 {insight}")
+                                
+                                st.subheader("Recommendations for Next Time")
+                                if learning_result["reflections"]["recommendations"]:
+                                    for i, rec in enumerate(learning_result["reflections"]["recommendations"], 1):
+                                        st.markdown(f"{i}. {rec}")
+                        else:
+                            st.warning("Please select an actual outcome to record learning.")
     
     with tab2:
         st.header("📈 Prediction History")
